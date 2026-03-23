@@ -1131,20 +1131,19 @@ npx newman run newman/hotel-booking-collection.json \
 **บันทึกผลการรัน Newman:**
 
 ```
-Collection Name    : ______________________________
-Total Requests     : ______________________________
-Total Assertions   : ______________________________
-Passed             : ______________________________
-Failed             : ______________________________
-Duration           : ______________________________
-Average Resp. Time : ______________________________ ms
+Collection Name    : Hotel Booking API Tests
+Total Requests     : 6
+Total Assertions   : 11
+Passed             : 11
+Failed             : 0
+Duration           : 239 ms
+Average Resp. Time :11 ms
 ```
 
 ![หน้าจอ Newman Terminal Output]('images/Newman Terminal.png')
 ### 📸 แทรกภาพหน้าจอ newman-reporter-htmlextra Report (ไฟล์ api-test-report.html)  ที่นี่
 
-![หน้าจอ Newman Report]('images/Newman Report.png')
-
+![หน้าจอ Newman Report](<images/Newman Report.png>)
 ---
 
 ### 🔧 แบบฝึกหัดที่ 2 — แก้ไขและทดลอง Newman Collection
@@ -1185,8 +1184,7 @@ npx newman run newman/hotel-booking-collection.json \
 
 📸 ตรวจสอบหน้า Report แทรกภาพหน้าจอที่เห็นชื่อนักศึกษา:
 
-![หน้าจอ Newman Report ที่แก้ไขข้อมูลแล้ว]('images/Newman report-edit.png')
-
+![หน้าจอ Newman Report ที่แก้ไขข้อมูลแล้ว](<images/Newman report-edit.png>)
 > ___
 
 ---
@@ -1210,8 +1208,10 @@ npx newman run newman/hotel-booking-collection.json -e newman/hotel-booking-env.
 บันทึกผล:
 📸 หน้าจอผล Error:
 
-![หน้าจอ Newman Error]('images/Newman Error.png')
-
+![หน้าจอ Newman Error](<images/Newman Error1.png>)
+![หน้าจอ Newman Error](<images/Newman Error2.png>)
+![หน้าจอ Newman Error](<images/Newman Error3.png>)
+![หน้าจอ Newman Error](<images/Newman Error4.png>)
 
 > 💡 **จุดประสงค์:** Environment Variable `baseUrl` ส่งผลต่อทุก Request — นี่คือเหตุผลที่ต้องใช้ตัวแปรแทนการพิมพ์ URL ซ้ำ
 
@@ -1237,8 +1237,8 @@ npx newman run newman/hotel-booking-collection.json -e newman/hotel-booking-env.
 ```
 
 ```
-Assertions ก่อนเพิ่ม : ______
-Assertions หลังเพิ่ม : ______
+Assertions ก่อนเพิ่ม : 11
+Assertions หลังเพิ่ม : 12
 ```
 
 ---
@@ -1269,6 +1269,7 @@ Assertions หลังเพิ่ม : ______
 
 📸 แทรกภาพหน้าจอ Newman ที่แสดง Request 8 ผ่าน (Pass):
 
+![ภาพหน้าจอ Newman Request 8 ผ่าน](<images/Request 8 ผ่าน.png>)
 > ___
 
 ---
@@ -1278,18 +1279,422 @@ Assertions หลังเพิ่ม : ______
 ## แบบทดสอบ
 1. สร้าง API เพิ่มเติม เพื่อรองรับการ CheckIn โดยมีการระบุ ID ของการจอง เพื่อใช้ CheckIn และใช้การจำลองข้อมูล JSON (ทำ Mockup) เพื่อส่ง Response ผลการ CheckIn กลับไป (นักศึกษาออกแบบ API ของตนเอง และให้เพิ่ม Comment ใน Code ให้ใส่ชื่อ และรหัสนักศึกษาเพื่อระบุว่าแก้ไขโดยใคร)
    ```
-   บันทึก Code และ รูปผลการทำงาน
+   const express = require('express');
+const app = express();
+
+const cors = require('cors');
+app.use(cors());
+app.use(express.json());
+
+const swaggerJsdoc = require('swagger-jsdoc');
+const swaggerUi = require('swagger-ui-express');
+const jwt = require('jsonwebtoken');
+
+const SECRET_KEY = "mysecretkey";
+
+// ==========================================================
+// Hotel Booking API 
+// จัดทำ/แก้ไขโดย: ญาดา แกล้วกล้า, รหัสนักศึกษา: 68030069
+// ==========================================================
+
+// ===============================
+// Middleware ตรวจสอบ Token
+// ===============================
+const authenticateToken = (req, res, next) => {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+  if (!token) return res.status(401).json({ message: "ไม่ได้ส่ง Token มาด้วย" });
+
+  jwt.verify(token, SECRET_KEY, (err, user) => {
+    if (err) return res.status(401).json({ message: "Token ไม่ถูกต้อง" });
+    req.user = user;
+    next();
+  });
+};
+
+// ===============================
+// Swagger Config
+// ===============================
+const swaggerOptions = {
+  definition: {
+    openapi: '3.0.0',
+    info: {
+      title: 'Hotel Booking API',
+      version: '1.0.0',
+      description: 'REST API สำหรับระบบจองห้องพักออนไลน์'
+    },
+    servers: [
+      {
+        url: '/',
+        description: 'Current Server'
+      }
+    ],
+    components: {
+      securitySchemes: {
+        bearerAuth: {
+          type: 'http',
+          scheme: 'bearer',
+          bearerFormat: 'JWT'
+        }
+      }
+    }
+  },
+  apis: ['./server.js']
+};
+
+const swaggerSpec = swaggerJsdoc(swaggerOptions);
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+
+// ===============================
+// Mock Database
+// ===============================
+let bookings = [];
+let nextId = 1;
+
+// ===============================
+// LOGIN
+// ===============================
+/**
+ * @swagger
+ * /api/login:
+ *   post:
+ *     summary: เข้าสู่ระบบ
+ *     tags: [Authentication]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               username:
+ *                 type: string
+ *               password:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Login สำเร็จ
+ */
+app.post('/api/login', (req, res) => {
+  const { username, password } = req.body;
+
+  if (!username || !password)
+    return res.status(400).json({ message: "กรุณากรอก username และ password" });
+
+  if (username !== "admin" || password !== "admin123")
+    return res.status(401).json({ message: "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง" });
+
+  const token = jwt.sign({ id: 1, username: "admin" }, SECRET_KEY, { expiresIn: '1h' });
+
+  res.json({ token });
+});
+
+// ===============================
+// GET BOOKINGS
+// ===============================
+/**
+ * @swagger
+ * /api/bookings:
+ *   get:
+ *     summary: ดูรายการจอง
+ *     tags: [Booking]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: สำเร็จ
+ */
+app.get('/api/bookings', authenticateToken, (req, res) => {
+  res.json(bookings);
+});
+
+// ===============================
+// CREATE BOOKING
+// ===============================
+/**
+ * @swagger
+ * /api/bookings:
+ *   post:
+ *     summary: สร้างการจอง
+ *     tags: [Booking]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       201:
+ *         description: สร้างสำเร็จ
+ */
+app.post('/api/bookings', authenticateToken, (req, res) => {
+  const newBooking = { id: nextId++, ...req.body };
+  bookings.push(newBooking);
+  res.status(201).json(newBooking);
+});
+
+// ===============================
+// GET BY ID
+// ===============================
+/**
+ * @swagger
+ * /api/bookings/{id}:
+ *   get:
+ *     summary: ดูการจองตาม ID
+ *     tags: [Booking]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: สำเร็จ
+ */
+app.get('/api/bookings/:id', authenticateToken, (req, res) => {
+  const booking = bookings.find(b => b.id == req.params.id);
+  if (!booking) return res.status(404).json({ message: "ไม่พบข้อมูล" });
+  res.json(booking);
+});
+
+// ===============================
+// UPDATE
+// ===============================
+/**
+ * @swagger
+ * /api/bookings/{id}:
+ *   put:
+ *     summary: แก้ไขการจอง
+ *     tags: [Booking]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: สำเร็จ
+ */
+app.put('/api/bookings/:id', authenticateToken, (req, res) => {
+  const index = bookings.findIndex(b => b.id == req.params.id);
+  if (index === -1) return res.status(404).json({ message: "ไม่พบข้อมูล" });
+
+  bookings[index] = { ...bookings[index], ...req.body };
+  res.json(bookings[index]);
+});
+
+// ===============================
+// DELETE
+// ===============================
+/**
+ * @swagger
+ * /api/bookings/{id}:
+ *   delete:
+ *     summary: ลบการจอง
+ *     tags: [Booking]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: สำเร็จ
+ */
+app.delete('/api/bookings/:id', authenticateToken, (req, res) => {
+  const index = bookings.findIndex(b => b.id == req.params.id);
+  if (index === -1) return res.status(404).json({ message: "ไม่พบข้อมูล" });
+
+  bookings.splice(index, 1);
+  res.json({ message: "ลบสำเร็จ" });
+});
+
+// ===============================
+// CHECK-IN
+// ===============================
+/**
+ * @swagger
+ * /api/bookings/{id}/checkin:
+ *   post:
+ *     summary: Check-in
+ *     tags: [CheckInOut]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: สำเร็จ
+ */
+// แก้ไขโดย: ญาดา แกล้วกล้า, รหัสนักศึกษา: 68030069
+app.post('/api/bookings/:id/checkin', authenticateToken, (req, res) => {
+  res.json({
+    message: "Check-in successful",
+    id: req.params.id
+  });
+});
+
+// ===============================
+// CHECK-OUT
+// ===============================
+/**
+ * @swagger
+ * /api/checkins/{id}/checkout:
+ *   post:
+ *     summary: Check-out
+ *     tags: [CheckInOut]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: สำเร็จ
+ */
+// แก้ไขโดย: ญาดา แกล้วกล้า, รหัสนักศึกษา: 68030069
+app.post('/api/checkins/:id/checkout', authenticateToken, (req, res) => {
+  res.json({
+    message: "Check-out started",
+    id: req.params.id
+  });
+});
+
+// ===============================
+// CONFIRM
+// ===============================
+/**
+ * @swagger
+ * /api/checkouts/{id}/confirm:
+ *   post:
+ *     summary: Confirm Check-out
+ *     tags: [CheckInOut]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: สำเร็จ
+ */
+// แก้ไขโดย: ญาดา แกล้วกล้า, รหัสนักศึกษา: 68030069
+app.post('/api/checkouts/:id/confirm', authenticateToken, (req, res) => {
+  res.json({
+    message: "Confirmed",
+    id: req.params.id
+  });
+});
+
+// ===============================
+// START SERVER
+// ===============================
+app.listen(3001, () => {
+  console.log("Server running on port 3001");
+  console.log("Swagger → http://localhost:3001/api-docs");
+});
+  
    ```
+  
    
 2. สร้าง API เพิ่มเติม เพื่อรองรับการ CheckOut โดยมีการระบ ID ของการ CheckIn เพื่อใช้ทำการ CheckOut และใช้การจำลองข้อมูล JSON (ทำ Mockup) เพื่อส่งรายละเอียดของการ CheckOut กลับไป (นักศึกษาออกแบบ API และ JSON ของตนเอง และให้เพิ่ม Comment ใน Code ให้ใส่ชื่อ และรหัสนักศึกษาเพื่อระบุว่าแก้ไขโดยใคร)
    ```
-   บันทึก Code และ รูปผลการทำงาน
+   // ===============================
+// CHECK-OUT
+// ===============================
+/**
+ * @swagger
+ * /api/checkins/{id}/checkout:
+ * post:
+ * summary: ทำรายการ Check-out โดยระบุ ID ของการ Check-in
+ * tags: [CheckInOut]
+ * security:
+ * - bearerAuth: []
+ * parameters:
+ * - in: path
+ * name: id
+ * required: true
+ * schema:
+ * type: string
+ * description: รหัสการ Check-in
+ * responses:
+ * 200:
+ * description: คืนค่ารายละเอียดการ Check-out กลับไป (Mockup JSON)
+ */
+// แก้ไขโดย: ญาดา แกล้วกล้า, รหัสนักศึกษา: 68030069
+app.post('/api/checkins/:id/checkout', authenticateToken, (req, res) => {
+  const checkInId = req.params.id;
+  
+  // จำลองข้อมูล JSON (Mockup) สำหรับรายละเอียดการ CheckOut ตามที่โจทย์กำหนด
+  const responseData = {
+    message: "Check-out process initiated successfully",
+    checkOutId: `CO-${checkInId}`,
+    checkInId: checkInId,
+    checkOutTime: new Date().toISOString(), // ดึงเวลาปัจจุบัน
+    additionalCharges: 500, // สมมติว่ามีค่าใช้จ่ายเพิ่มเติมเช่น ค่ามินิบาร์
+    status: "Pending-Confirmation" // รอการยืนยัน
+  };
+
+  res.status(200).json(responseData);
+});
    ```
    
 3. สร้าง API เพิ่มเติม เพื่อรองรับการ ConfirmCheckOut (เพิ่ม Comment ใน Code ให้ใส่ชื่อ และรหัสนักศึกษาเพื่อระบุว่าแก้ไขโดยใคร)
 
    ```
-   บันทึก Code และ รูปผลการทำงาน
+   // ===============================
+// CONFIRM CHECK-OUT
+// ===============================
+/**
+ * @swagger
+ * /api/checkouts/{id}/confirm:
+ * post:
+ * summary: ยืนยันการทำรายการ Check-out
+ * tags: [CheckInOut]
+ * security:
+ * - bearerAuth: []
+ * parameters:
+ * - in: path
+ * name: id
+ * required: true
+ * schema:
+ * type: string
+ * description: รหัสการ Check-out
+ * responses:
+ * 200:
+ * description: ยืนยันการ Check-out สำเร็จ
+ */
+// แก้ไขโดย: ญาดา แกล้วกล้า, รหัสนักศึกษา: 68030069
+app.post('/api/checkouts/:id/confirm', authenticateToken, (req, res) => {
+  const checkOutId = req.params.id;
+  
+  // จำลองข้อมูล JSON (Mockup) เพื่อส่งผลการยืนยันกลับไป
+  const responseData = {
+    message: "Check-out confirmed successfully",
+    checkOutId: checkOutId,
+    confirmTime: new Date().toISOString(),
+    status: "Completed",
+    paymentStatus: "Paid",
+    thankYouMessage: "Thank you for staying with us!"
+  };
+
+  res.status(200).json(responseData);
+});
    ```
       
 4. แก้ไข Swagger และ Newman เพื่อทดสอบการทำงาน
@@ -1308,32 +1713,36 @@ Assertions หลังเพิ่ม : ______
 
 ```
 คำตอบ:
-__________________________________________________________________
-__________________________________________________________________
+Swagger UI เป็นเครื่องมือสำหรับแสดงเอกสาร API และสามารถทดสอบ API ได้แบบ Interactive ผ่านหน้าเว็บ เหมาะสำหรับการทดลองเรียก API ทีละ endpoint และใช้ในการอธิบายโครงสร้าง API ให้ผู้พัฒนาเข้าใจ
+ส่วน Newman เป็นเครื่องมือสำหรับรันชุดทดสอบ (Collection) ของ Postman แบบอัตโนมัติผ่าน Command Line เหมาะสำหรับการทดสอบซ้ำ ๆ และใช้ในระบบ CI/CD
+
 ```
 
 **ข้อ 2.** `$ref: '#/components/schemas/Booking'` ใน JSDoc Comment หมายความว่าอะไร มีประโยชน์อย่างไรเมื่อเทียบกับการเขียน schema inline?
 
 ```
 คำตอบ:
-__________________________________________________________________
-__________________________________________________________________
+$ref: '#/components/schemas/Booking' หมายถึงการอ้างอิง schema ที่ชื่อว่า Booking ซึ่งถูกกำหนดไว้ในส่วน components/schemas ของ Swagger
+ข้อดีคือช่วยลดการเขียน schema ซ้ำ ทำให้โค้ดเป็นระเบียบ แก้ไขง่าย และสามารถนำ schema เดิมไปใช้ซ้ำได้หลายที่ ต่างจากการเขียน inline ที่ต้องเขียนใหม่ทุกครั้งและอาจเกิดความผิดพลาดได้
+
 ```
 
 
 **ข้อ 3.** ถ้าต้องการให้ Newman รัน Collection ซ้ำ 5 รอบ จะเพิ่ม flag อะไรในคำสั่ง และผลลัพธ์ที่ควรระวังคืออะไร?
 
 ```
-คำตอบ: flag ที่ใช้คือ ______
-ผลที่ควรระวัง: _______________________________________________
+คำตอบ: flag ที่ใช้คือ --iteration-count 5
+ผลที่ควรระวัง: อาจเกิดข้อมูลซ้ำ (duplicate data) หรือข้อมูลผิดพลาดในฐานข้อมูล เช่น มีการเพิ่มข้อมูลเดิมหลายครั้ง หรือ state ของระบบเปลี่ยนไป ทำให้ผลลัพธ์แต่ละรอบไม่เหมือนกัน
+
 ```
 
 **ข้อ 4.** จากการทดลองในใบงานนี้ นักศึกษามองว่าควรเขียน Swagger Documentation ก่อนหรือหลัง Code API และ Newman ควรรันเมื่อไหร่ในกระบวนการพัฒนา?
 
 ```
 คำตอบ:
-__________________________________________________________________
-__________________________________________________________________
+ควรเขียน Swagger Documentation ก่อนหรือควบคู่กับการเขียน Code API เพื่อวางโครงสร้างและกำหนดรูปแบบ API ให้ชัดเจนตั้งแต่ต้น
+ส่วน Newman ควรรันหลังจากพัฒนา API เสร็จในแต่ละส่วน หรือหลังมีการแก้ไขโค้ด เพื่อทดสอบความถูกต้อง และควรนำไปใช้ในขั้นตอน CI/CD เพื่อทดสอบอัตโนมัติทุกครั้งก่อน deploy
+
 ```
 
 ---

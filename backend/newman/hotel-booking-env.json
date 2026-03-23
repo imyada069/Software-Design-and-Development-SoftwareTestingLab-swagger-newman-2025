@@ -1,0 +1,21 @@
+{
+  "id": "hotel-env",
+  "name": "Hotel Booking Local",
+  "values": [
+    {
+      "key": "baseUrl",
+      "value": "http://127.0.0.1:3001",
+      "enabled": true
+    },
+    {
+      "key": "token",
+      "value": "",
+      "enabled": true
+    },
+    {
+      "key": "bookingId",
+      "value": "",
+      "enabled": true
+    }
+  ]
+}

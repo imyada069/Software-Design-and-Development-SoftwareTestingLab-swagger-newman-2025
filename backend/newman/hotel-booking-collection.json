@@ -1,0 +1,277 @@
+{
+  "info": {
+    "name": "Hotel Booking API Tests",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "1. POST Login",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 200',()=>pm.response.to.have.status(200));",
+              "let d=pm.response.json();",
+              "pm.environment.set('token',d.token);",
+              "pm.test('Token exists',()=>pm.expect(d.token).to.be.a('string').and.not.empty);",
+              "pm.test(\"user.id is a positive number\", function() {",
+              "  const d = pm.response.json();",
+              "  pm.expect(d.user.id).to.be.a(\"number\").and.above(0);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"username\":\"admin\",\"password\":\"admin123\"}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/login",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "login"
+          ]
+        }
+      }
+    },
+    {
+      "name": "2. POST Booking",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 201',()=>pm.response.to.have.status(201));",
+              "let d=pm.response.json();",
+              "pm.environment.set('bookingId',d.id);",
+              "pm.test('Booking created',()=>pm.expect(d).to.have.property('id'));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"fullname\":\"Yada Klawekla\",\"email\":\"650xxxxx@university.ac.th\",\"phone\":\"0812345678\",\"checkin\":\"2026-12-01\",\"checkout\":\"2026-12-03\",\"roomtype\":\"standard\",\"guests\":2}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/bookings",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "bookings"
+          ]
+        }
+      }
+    },
+    {
+      "name": "3. GET Bookings",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 200',()=>pm.response.to.have.status(200));",
+              "pm.test('Array response',()=>pm.expect(pm.response.json()).to.be.an('array'));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/bookings",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "bookings"
+          ]
+        }
+      }
+    },
+    {
+      "name": "4. GET Booking By ID",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 200',()=>pm.response.to.have.status(200));",
+              "let d=pm.response.json();",
+              "pm.test('Correct id',()=>pm.expect(d.id).to.eql(parseInt(pm.environment.get('bookingId'))));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/bookings/{{bookingId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "bookings",
+            "{{bookingId}}"
+          ]
+        }
+      }
+    },
+    {
+      "name": "5. PUT Booking",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 200',()=>pm.response.to.have.status(200));",
+              "let d=pm.response.json();",
+              "pm.test('Guests updated',()=>pm.expect(d.guests).to.eql(3));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"fullname\":\"Updated Yada\",\"email\":\"update@test.com\",\"phone\":\"0899999999\",\"checkin\":\"2026-12-01\",\"checkout\":\"2026-12-05\",\"roomtype\":\"deluxe\",\"guests\":3}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/bookings/{{bookingId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "bookings",
+            "{{bookingId}}"
+          ]
+        }
+      }
+    },
+    {
+      "name": "6. DELETE Booking",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 200',()=>pm.response.to.have.status(200));",
+              "pm.environment.unset('bookingId');"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "DELETE",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/bookings/{{bookingId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "bookings",
+            "{{bookingId}}"
+          ]
+        }
+      }
+    },
+    {
+      "name": "8. POST /api/login — Wrong Password",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status 401 Unauthorized', function () { pm.response.to.have.status(401); });",
+              "pm.test('Has error message', function () { var jsonData = pm.response.json(); pm.expect(jsonData).to.have.property('message'); });"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"username\":\"admin\",\"password\":\"wrongpassword\"}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/login",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "login"
+          ]
+        }
+      }
+    }
+  ]
+}
